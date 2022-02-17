@@ -1,6 +1,19 @@
-buttons:
+scenes:
   0: "Chargement"
   1: "Chat"
   2: "Coding"
-  3: "Pause"
+  3: "Atelier Top"
+  4: "Bureau"
+  6: "Pause"
+  7: "Bye"
+
+audio:
+  0: "Fond sonore"
+  1: "Bird UM1"
+  2: "Wireless GO"
+
+reactions:
+  29: "Facepalm"
+  30: "CestDeLaMerde"
+  31: "BlagueValide"
 
