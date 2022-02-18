@@ -31,12 +31,13 @@ impl APCMini {
         let midi_in = MidiInput::new("My test input")?;
         let port_out = Self::find_apcmini_output(&midi_out).ok_or(anyhow!("cannot find APCMini output port"))?;
         let port_in = Self::find_apcmini_input(&midi_in).ok_or(anyhow!("cannot find APCMini input port"))?;
-        let apc_out =  midi_out.connect(&port_out, "APCMini").expect("OOps");
+        let apc_out =  midi_out.connect(&port_out, "APCMini")
+            .map_err(|_| anyhow!("cannot connect to APCMini output"))?;
         
         // Connect to our MIDI controller (for input)
         let apc_in = midi_in.connect(&port_in, "APCMini", move |_, message, _| {
                 let _ = tx.blocking_send(message.to_vec());
-        }, ()).map_err(|_| anyhow!("cannot connect to APCMini"))?;
+        }, ()).map_err(|_| anyhow!("cannot connect to APCMini input"))?;
 
         Ok(APCMini {
             apc_out,
