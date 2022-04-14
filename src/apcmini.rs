@@ -12,7 +12,7 @@ pub enum LedState {
     Red = 3,
     //BlinkRed = 4,
     Yellow = 5,
-    //BlinkYellow = 6
+    BlinkYellow = 6
 }
 
 /// APCMini MIDI controller
