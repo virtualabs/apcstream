@@ -5,7 +5,7 @@ use std::{thread, time};
 
 // Load APC Mini controller.
 mod apcmini;
-use apcmini::{APCMini};
+use apcmini::{APCMini, Message};
 
 // Load configuration helpers.
 mod config;
@@ -24,39 +24,41 @@ async fn obsws_connect() -> Result<Client> {
 #[tokio::main]
 async fn main() -> Result<()> {
   
+  let (tx, mut rx) = mpsc::channel::<Message>(32);
+  let config = load_deck_config()?;
+  let mut apcmini = APCMini::new(tx)?; 
 
   /* Daemon keeps running and try to connect to remote service. */
   loop {
 
-    let (tx, mut rx) = mpsc::channel(32);
-    let config = load_deck_config()?;
-    let apcmini = APCMini::new(tx)?; 
-
     /* Connect to the OBS instance through obs-websocket. */
     if let Ok(client) = obsws_connect().await {
-      let mut controller = Controller::new(apcmini, config, client).await?;
+      let mut controller = Controller::new(&mut apcmini, &config, client).await?;
       
       /* Main loop, process messages. */
       while let Some(message) = rx.recv().await {
-          match (message[0], message[1]) {
-              (0x90, 0...63) => {
-                if controller.on_button_press(message[1]).await.is_err() {
-                  break;
-                }
-              },
+          match message {
+            
+            /* Button has been pressed (switch scenes and video sources). */
+            Message::Button{id} => {
+              if controller.on_button_press(id).await.is_err() {
+                break;
+              }
+            },
 
-              (0x90, 64...71) => {
-                if controller.on_slider_btn_press(message[1]).await.is_err() {
-                  break;
-                }
-              },
+            /* Slider button has been pressed (handle mute/unmute). */
+            Message::SliderButton{id} => {
+              if controller.on_slider_btn_press(id).await.is_err() {
+                break;
+              }
+            },
 
-              (0xB0, 48...57) => {
-                if controller.on_slider_change(message[1]-48, message[2]).await.is_err() {
-                  break;
-                }
-              },
-              _ => {}
+            /* Slider value has been changed (set volume). */
+            Message::Slider{id,value} => {
+              if controller.on_slider_change(id, value).await.is_err() {
+                break;
+              }
+            },
           }
       }
 

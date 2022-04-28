@@ -18,9 +18,9 @@ enum VideoSourceState {
 }
 
 
-pub struct Controller {
-  apcmini: APCMini,
-  config: DeckConfig,
+pub struct Controller<'a> {
+  apcmini: &'a mut APCMini,
+  config: &'a DeckConfig,
   client: Client,
   audio_sources: Vec<String>,
   audio_states: HashMap<u8, AudioSourceState>,
@@ -29,10 +29,13 @@ pub struct Controller {
   current_scene: Option<u8>
 }
 
-impl Controller {
+impl<'a> Controller<'a> {
 
-  /* "Constructor" */
-  pub async fn new(mut apcmini:APCMini, config: DeckConfig, client: Client) -> anyhow::Result<Controller> {
+  /**
+   * Creates a controller instance.
+   **/
+
+  pub async fn new(apcmini:&'a mut APCMini, config: &'a DeckConfig, client: Client) -> anyhow::Result<Controller<'a>> {
     
     /* Retrieve audio  sources from OBS websocket client. */
     let mut audio_sources = Vec::new();
@@ -90,6 +93,7 @@ impl Controller {
     Ok(controller)
   }
 
+
   /**
    * Dispatch button press event.
    **/
@@ -107,10 +111,14 @@ impl Controller {
     Ok(())
   }
 
-  pub async fn on_slider_btn_press(&mut self, btn_id: u8) -> anyhow::Result<()> {
 
-    let audio_index = btn_id - 64;
-    let audio_source = self.config.get_audiosource_by_slider(audio_index);
+  /**
+   * Dispatch slider button press event.
+   **/
+
+  pub async fn on_slider_btn_press(&mut self, btn_id: u8) -> anyhow::Result<()> {
+    let slider_id = btn_id - 64;
+    let audio_source = self.config.get_audiosource_by_slider(slider_id);
     if let Some(audio_source) = audio_source {
       self.toggle_audio_source(audio_source, btn_id).await?;
     }
@@ -118,14 +126,24 @@ impl Controller {
     Ok(())
   }
 
+
+  /**
+   * Dispatch slider value change event.
+   **/
+
   pub async fn on_slider_change(&mut self, slider_id: u8, slider_value: u8) -> anyhow::Result<()> {
-    let audio_source = self.config.get_audiosource_by_slider(slider_id-48);
+    let audio_source = self.config.get_audiosource_by_slider(slider_id);
     if let Some(name) = audio_source {
       self.set_volume(name, slider_value).await?;
     }
 
     Ok(())
   }
+
+
+  /**
+   * Switch to a specific scene and set button light accordingly.
+   **/
 
   pub async fn switch_to_scene(&mut self, scene: String, btn_id: u8) -> anyhow::Result<()> {
     if self.current_scene.is_none() {
@@ -143,6 +161,11 @@ impl Controller {
 
     Ok(())
   }
+
+
+  /**
+   * Toggle video source and set button light accordingly.
+   **/
 
   pub async fn toggle_video_source(&mut self, source: String, btn_id: u8) -> anyhow::Result<()> {
     /* If current scene is set and video_source exists. */
@@ -182,6 +205,11 @@ impl Controller {
     Ok(())
   }
 
+
+  /**
+   * Mute/unmute audio source and set slider button accordingly.
+   **/
+
   pub async fn toggle_audio_source(&mut self, audio_source: String, btn_id: u8) -> anyhow::Result<()> {
     let audio_index = btn_id - 64;
 
@@ -210,6 +238,10 @@ impl Controller {
   }
 
 
+  /**
+   * Set audio source volume.
+   **/
+   
   pub async fn set_volume(&mut self, audio_source: String, volume: u8) -> anyhow::Result<()> {
     let volume = Volume {
         source : &audio_source,

@@ -15,15 +15,40 @@ pub enum LedState {
     BlinkYellow = 6
 }
 
+
+/// APC Mini MIDI message.
+pub enum Message {
+  /// Normal button has been pressed.
+  Button{id:u8},
+
+  /// Slider value has changed.
+  Slider{id:u8, value:u8},
+
+  /// Slider button has been pressed.
+  SliderButton{id:u8},
+}
+
+impl Message {
+  fn from_midi(message: &[u8]) -> Option<Message> {
+    match message {
+      [0x90, id@0..=63, ..] => Some(Message::Button{id:*id}),
+      [0x90, id@64..=71, ..] => Some(Message::SliderButton{id:*id}),
+      [0xB0, id@48..=57, value, ..] => Some(Message::Slider{id:*id - 48, value:*value}),
+      _ => None
+    }
+  }
+}
+
 /// APCMini MIDI controller
 pub struct APCMini {
     apc_out: MidiOutputConnection,
     apc_in: MidiInputConnection<()>
 }
 
+
 impl APCMini {
 
-    pub fn new(tx: Sender<Vec<u8>>) -> anyhow::Result<APCMini> {
+    pub fn new(tx: Sender<Message>) -> anyhow::Result<APCMini> {
 
         let midi_out = MidiOutput::new("My Test Output")?;
         let midi_in = MidiInput::new("My test input")?;
@@ -33,7 +58,10 @@ impl APCMini {
         
         // Connect to our MIDI controller (for input)
         let apc_in = midi_in.connect(&port_in.unwrap(), "APCMini", move |_, message, _| {
-                let _ = tx.blocking_send(message.to_vec());
+          let parsed_msg = Message::from_midi(message);
+          if let Some(msg) = parsed_msg {
+            let _ = tx.blocking_send(msg);
+          }
         }, ()).unwrap();
 
         Ok(APCMini {
